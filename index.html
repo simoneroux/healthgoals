@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light dark">
+<title>Health Goal Dashboard</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --panel:#ffffff; --ink:#111318; --muted:#6b7280;
+    --line:#e5e7eb; --line-strong:#d1d5db;
+    --accent:#e5322d; --accent-soft:#fdecec;
+    --hit:#16a34a; --hit-soft:#e7f6ec;
+    --miss:#dc2626; --miss-soft:#fdecec;
+    --chip:#f1f3f5;
+    --shadow:0 1px 2px rgba(16,24,40,.04), 0 1px 3px rgba(16,24,40,.06);
+    --radius:16px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0e0f13; --panel:#16181e; --ink:#f3f4f6; --muted:#9aa2ad;
+      --line:#262a32; --line-strong:#333844;
+      --accent:#ff5a54; --accent-soft:#2a1515;
+      --hit:#3fbf6b; --hit-soft:#12251a;
+      --miss:#f0554f; --miss-soft:#2a1414;
+      --chip:#20242c;
+      --shadow:0 1px 2px rgba(0,0,0,.3);
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased; line-height:1.4;
+  }
+  .wrap{max-width:1400px; margin:0 auto; padding:28px 20px 80px;}
+
+  /* Header */
+  header.top{
+    display:flex; flex-wrap:wrap; align-items:flex-start; gap:20px;
+    justify-content:space-between; margin-bottom:28px;
+  }
+  h1{font-size:clamp(28px,4vw,46px); font-weight:800; letter-spacing:-.02em; margin:0;}
+  .subtitle{margin:6px 0 0; color:var(--muted); font-size:15px; font-variant-numeric:tabular-nums;}
+  .subtitle b{color:var(--ink); font-weight:700;}
+  .subtitle .sep{opacity:.4; margin:0 8px;}
+
+  .toolbar{display:flex; flex-wrap:wrap; gap:8px; align-items:center;}
+  .menu-wrap{position:relative;}
+  .menu{position:absolute; right:0; top:calc(100% + 6px); z-index:40;
+    background:var(--panel); border:1px solid var(--line-strong); border-radius:12px;
+    box-shadow:0 10px 30px rgba(0,0,0,.18); padding:6px; min-width:170px;
+    display:flex; flex-direction:column; gap:2px;}
+  .menu[hidden]{display:none;}
+  .menu button{display:flex; align-items:center; gap:8px; width:100%; text-align:left;
+    background:transparent; border:none; padding:9px 11px; border-radius:8px;
+    font:inherit; font-size:13px; font-weight:600; color:var(--ink); cursor:pointer;}
+  .menu button:hover{background:var(--chip);}
+  button.btn, .btn{
+    font:inherit; font-size:13px; font-weight:600; cursor:pointer;
+    background:var(--panel); color:var(--ink);
+    border:1px solid var(--line-strong); border-radius:10px;
+    padding:8px 12px; box-shadow:var(--shadow); transition:.12s;
+    display:inline-flex; align-items:center; gap:6px;
+  }
+  button.btn:hover{border-color:var(--accent);}
+  button.btn.primary{background:var(--accent); color:#fff; border-color:var(--accent);}
+  button.btn.ghost{background:transparent; box-shadow:none; border-color:transparent; color:var(--muted);}
+  button.btn.ghost:hover{color:var(--accent);}
+
+  /* Months grid */
+  .months{
+    display:grid; gap:20px;
+    grid-template-columns:repeat(auto-fill, minmax(340px, 1fr));
+  }
+  .month{
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+    box-shadow:var(--shadow); padding:16px; position:relative;
+  }
+  .month.current{border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-soft), var(--shadow);}
+  .m-head{display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; gap:8px;}
+  .m-title{font-weight:800; letter-spacing:.02em; text-transform:uppercase; font-size:15px;}
+  .m-sub{color:var(--muted); font-size:12px; font-variant-numeric:tabular-nums; margin-top:2px;}
+  .m-sub b.hit{color:var(--hit);} .m-sub b.miss{color:var(--miss);}
+  .m-sub .delta.good{color:var(--hit); font-weight:700;}
+  .m-sub .delta.bad{color:var(--miss); font-weight:700;}
+  .m-sub .muted{opacity:.7;}
+
+  .m-body{display:flex; gap:8px;}
+  .weekcol{display:flex; flex-direction:column; gap:4px; width:46px; flex:none; padding-top:24px;}
+  .weekcell{
+    flex:1; border-radius:8px; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    font-size:11px; font-weight:700; font-variant-numeric:tabular-nums;
+    background:var(--chip); color:var(--muted); min-height:34px;
+  }
+  .weekcell.good{background:var(--hit-soft); color:var(--hit);}
+  .weekcell.mixed{background:var(--miss-soft); color:var(--miss);}
+  .weekcell small{font-weight:600; opacity:.7; font-size:9px;}
+
+  .cal{flex:1; display:flex; flex-direction:column; gap:4px;}
+  .dow{display:grid; grid-template-columns:repeat(7,1fr); gap:4px;}
+  .dow span{text-align:center; font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase;}
+  .week{display:grid; grid-template-columns:repeat(7,1fr); gap:4px;}
+  .day{
+    aspect-ratio:1/1; border:1px solid var(--line); border-radius:9px;
+    position:relative; cursor:pointer; user-select:none; background:var(--panel);
+    display:flex; align-items:center; justify-content:center; transition:.1s;
+  }
+  .day:hover{border-color:var(--line-strong);}
+  .day.empty{visibility:hidden; cursor:default;}
+  .day .num{position:absolute; top:3px; left:5px; font-size:10px; color:var(--muted); font-variant-numeric:tabular-nums;}
+  .day .val{font-size:clamp(11px,3vw,14px); font-weight:800; line-height:1; font-variant-numeric:tabular-nums; padding:0 2px; text-align:center;}
+  .day.hit{background:var(--hit-soft); border-color:var(--hit);}
+  .day.hit .val, .day.hit .num{color:var(--hit);}
+  .day.miss{background:var(--miss-soft); border-color:var(--miss);}
+  .day.miss .val, .day.miss .num{color:var(--miss);}
+  .day.logged{background:var(--chip); border-color:var(--line-strong);}
+  .day.today{box-shadow:0 0 0 2px var(--accent);}
+  .day.future{opacity:.55;}
+
+  .empty-state{grid-column:1/-1; text-align:center; color:var(--muted); padding:60px 20px;
+    border:2px dashed var(--line-strong); border-radius:var(--radius);}
+  .empty-state p{margin:6px 0;}
+
+  /* Modal */
+  .overlay{position:fixed; inset:0; background:rgba(10,12,16,.45); backdrop-filter:blur(2px);
+    display:none; align-items:center; justify-content:center; padding:20px; z-index:50;}
+  .overlay.open{display:flex;}
+  .modal{background:var(--panel); border-radius:18px; box-shadow:0 20px 60px rgba(0,0,0,.3);
+    width:100%; max-width:440px; padding:22px; border:1px solid var(--line);}
+  .modal h2{margin:0 0 16px; font-size:18px;}
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:12px; font-weight:700; color:var(--muted); margin-bottom:5px; text-transform:uppercase; letter-spacing:.03em;}
+  .field input, .field select{
+    width:100%; font:inherit; font-size:14px; padding:9px 11px;
+    border:1px solid var(--line-strong); border-radius:10px; background:var(--bg); color:var(--ink);
+  }
+  .row2{display:flex; gap:10px;} .row2 > *{flex:1;}
+  .modal-actions{display:flex; justify-content:flex-end; gap:8px; margin-top:20px;}
+  .hint{font-size:12px; color:var(--muted); margin-top:-6px; margin-bottom:14px;}
+  .dot{width:8px; height:8px; border-radius:50%; background:var(--line-strong); display:inline-block;}
+  .dot.on{background:var(--hit);} .dot.err{background:var(--miss);} .dot.busy{background:#f59e0b;}
+  .synced-as{font-size:13px; margin-bottom:10px;} .synced-as b{font-weight:700;}
+  code.sql{display:block; white-space:pre; overflow:auto; background:var(--bg); border:1px solid var(--line);
+    border-radius:8px; padding:10px; font-size:11px; margin:8px 0;}
+
+  @media (max-width:720px){
+    .wrap{padding:20px 14px 60px;}
+    header.top{flex-direction:column; gap:14px;}
+    .months{grid-template-columns:1fr;}
+    .weekcol{display:none;}      /* hide weekly side column on phone */
+    .day .num{font-size:9px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Health Goal Dashboard</h1>
+    </div>
+  </header>
+
+  <div class="toolbar" style="margin-bottom:20px;">
+    <button class="btn primary" id="rangeBtn">＋ Months</button>
+    <button class="btn" id="settingsBtn">◎ Objective</button>
+    <span style="flex:1"></span>
+    <div class="menu-wrap">
+      <button class="btn" id="gearBtn" title="Data" aria-haspopup="true">⚙</button>
+      <div class="menu" id="gearMenu" hidden>
+        <button id="exportBtn">↧ Export data</button>
+        <button id="importBtn">↥ Import data</button>
+      </div>
+    </div>
+    <button class="btn" id="syncBtn"><span class="dot" id="syncDot"></span>Sync</button>
+    <input type="file" id="importFile" accept="application/json" hidden>
+  </div>
+
+  <div class="months" id="months"></div>
+</div>
+
+<!-- Month range modal -->
+<div class="overlay" id="rangeOverlay">
+  <div class="modal">
+    <h2>Months to track</h2>
+    <p class="hint">Pick the first and last month — everything in between is shown.</p>
+    <div class="row2">
+      <div class="field">
+        <label>From</label>
+        <input type="month" id="rangeStart">
+      </div>
+      <div class="field">
+        <label>To</label>
+        <input type="month" id="rangeEnd">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn ghost" data-close>Cancel</button>
+      <button class="btn primary" id="rangeConfirm">Apply</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings modal -->
+<div class="overlay" id="settingsOverlay">
+  <div class="modal">
+    <h2>Daily calorie goal</h2>
+    <div class="field">
+      <label>Stay at or under (full number)</label>
+      <input type="number" id="setValue" step="any" inputmode="numeric" placeholder="2000">
+    </div>
+    <p class="hint">A day counts as a hit when it's ≤ this. Weekly goal = ×7, monthly goal = ×days in that month. Views show numbers as “k” (2000 → 2k).</p>
+    <div class="modal-actions">
+      <button class="btn ghost" data-close>Cancel</button>
+      <button class="btn primary" id="settingsSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Day entry modal -->
+<div class="overlay" id="dayOverlay">
+  <div class="modal">
+    <h2 id="dayTitle">Log day</h2>
+    <p class="hint" id="dayGoal"></p>
+    <div class="field">
+      <label id="dayLbl">Value</label>
+      <input type="number" step="any" inputmode="numeric" id="dayInput" placeholder="e.g. 1500">
+    </div>
+    <div class="modal-actions">
+      <button class="btn ghost" data-close>Cancel</button>
+      <button class="btn ghost" id="dayClear">Clear day</button>
+      <button class="btn primary" id="daySave">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Cloud sync modal -->
+<div class="overlay" id="syncOverlay">
+  <div class="modal">
+    <h2>Cloud sync</h2>
+    <div id="syncBody"></div>
+    <div class="modal-actions">
+      <button class="btn ghost" data-close>Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+"use strict";
+/* ===== Supabase config =====
+   These are PUBLIC values (the publishable client key) — safe to commit.
+   Row-Level Security + the WebAuthn ceremony on Supabase's side guard the data. */
+const SUPABASE_URL = "https://noaeveuttdltzmuuifsf.supabase.co";
+const SUPABASE_KEY = "sb_publishable_MA28buHnRA9yQH8SVVfE3w_d2Ufr72M";
+
+const KEY = "healthGoalDashboard.v1";
+const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const DOW_SUN = ["S","M","T","W","T","F","S"];   // weeks always start Sunday
+
+const defaultState = () => ({
+  metric:{ name:"Calories", value:2000, dir:"at most" },   // goal in FULL numbers; "at most" = stay under
+  range:{ start: ymKey(new Date()), end: ymKey(new Date()) },
+  entries:{},                // { "YYYY-MM-DD": <full number> }
+  updatedAt:0                // ms epoch of last local change (for sync conflict resolution)
+});
+
+let state = load();
+
+/* ---------- helpers ---------- */
+function ymKey(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; }
+function dateKey(y,m,day){ return `${y}-${String(m+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`; }
+function daysInMonth(y,m){ return new Date(y, m+1, 0).getDate(); }
+function todayKey(){ return dateKey(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()); }
+// Display any full number compactly as thousands, e.g. 2000 -> "2k", 16500 -> "16.5k".
+function fmtK(n){
+  if(n===""||n===null||n===undefined||isNaN(n)) return "—";
+  const k = (+n)/1000;
+  const r = Math.round(k*10)/10;
+  return (Number.isInteger(r) ? String(r) : r.toFixed(1)) + "k";
+}
+
+function load(){
+  try{
+    const raw = localStorage.getItem(KEY);
+    if(!raw) return defaultState();
+    const parsed = JSON.parse(raw);
+    const s = Object.assign(defaultState(), parsed);
+
+    // --- migrations from earlier formats (detect via `parsed`, not the merged defaults) ---
+    // Legacy stored values in "k" scale (metric.unit === "k"): rescale to full numbers.
+    if(s.metric && s.metric.unit !== undefined){
+      if(typeof s.metric.value === "number") s.metric.value *= 1000;
+      if(s.entries) for(const k in s.entries){
+        if(typeof s.entries[k] === "number") s.entries[k] *= 1000;
+      }
+      delete s.metric.unit;
+    }
+    // Legacy hit/miss strings -> drop (values are numbers now).
+    if(s.entries) for(const k in s.entries){
+      if(typeof s.entries[k] !== "number") delete s.entries[k];
+    }
+    // Legacy months[] with no saved range -> derive a start/end range from it.
+    if(parsed.range === undefined && Array.isArray(parsed.months) && parsed.months.length){
+      const sorted = [...parsed.months].sort();
+      s.range = { start: sorted[0], end: sorted[sorted.length-1] };
+    }
+    if(!s.range || !s.range.start || !s.range.end){
+      s.range = { start: ymKey(new Date()), end: ymKey(new Date()) };
+    }
+    delete s.months; delete s.weekStart;
+    return s;
+  }catch(e){ return defaultState(); }
+}
+let applyingRemote = false;   // true while adopting cloud data (suppress bump + push)
+function save(){
+  if(!applyingRemote) state.updatedAt = Date.now();
+  try{ localStorage.setItem(KEY, JSON.stringify(state)); }
+  catch(e){ /* storage unavailable (private mode / sandbox) — keep working in memory */ }
+  if(!applyingRemote) scheduleCloudPush();
+}
+
+/* ---------- rendering ---------- */
+function renderSubtitle(){ /* subtitle removed; kept as a no-op for existing call sites */ }
+
+// All year-months from range.start to range.end, inclusive.
+function monthsInRange(){
+  const r = state.range || {};
+  let a = r.start, b = r.end;
+  if(!a || !b) return [];
+  if(a > b){ const t=a; a=b; b=t; }
+  const out = [];
+  let [y,m] = a.split("-").map(Number); m -= 1;
+  const [ey,em] = b.split("-").map(Number);
+  while(y < ey || (y===ey && m <= em-1)){
+    out.push(`${y}-${String(m+1).padStart(2,"0")}`);
+    m++; if(m>11){ m=0; y++; }
+  }
+  return out;
+}
+
+function renderMonths(){
+  const host = document.getElementById("months");
+  host.innerHTML = "";
+  const months = monthsInRange();
+  if(months.length===0){
+    host.innerHTML = `<div class="empty-state">
+      <p style="font-weight:700;color:var(--ink)">No months selected</p>
+      <p>Click “＋ Months” to choose a range.</p></div>`;
+    return;
+  }
+  const curKey = ymKey(new Date());
+  for(const key of months){
+    host.appendChild(renderMonthCard(key, key===curKey));
+  }
+}
+
+function renderMonthCard(key, isCurrent){
+  const [y,mm] = key.split("-").map(Number);
+  const m = mm-1;
+  const dim = daysInMonth(y,m);
+  const offset = new Date(y,m,1).getDay();              // leading blanks (weeks start Sunday)
+
+  // build weeks
+  const cells = [];
+  for(let i=0;i<offset;i++) cells.push(null);
+  for(let d=1; d<=dim; d++) cells.push(d);
+  while(cells.length%7!==0) cells.push(null);
+  const weeks = [];
+  for(let i=0;i<cells.length;i+=7) weeks.push(cells.slice(i,i+7));
+
+  // stats
+  let hits=0, miss=0, logged=0, total=0;
+  for(let d=1; d<=dim; d++){
+    const v = state.entries[dateKey(y,m,d)];
+    if(v===undefined || v===null) continue;
+    logged++; total += v;
+    const h = isHit(v);
+    if(h===true) hits++; else if(h===false) miss++;
+  }
+
+  // monthly objective = daily goal × days in THIS month (months aren't equal)
+  const gv = state.metric.value;
+  const goalSet = !(gv===null || gv===undefined || gv==="" || isNaN(gv));
+  let goalLine;
+  if(goalSet){
+    const monthGoal = gv * dim;
+    if(logged>0){
+      const delta = total - monthGoal;
+      const good = state.metric.dir==="at most" ? total<=monthGoal : total>=monthGoal;
+      const sign = delta>=0 ? "+" : "−";
+      goalLine = `<b>${fmtK(total)}</b> / ${fmtK(monthGoal)} `
+               + `<span class="delta ${good?'good':'bad'}">${sign}${fmtK(Math.abs(delta))}</span>`;
+    } else {
+      goalLine = `<span class="muted">0 / ${fmtK(monthGoal)} goal</span>`;
+    }
+  } else {
+    goalLine = `Σ <b>${fmtK(total)}</b>`;
+  }
+
+  const card = document.createElement("div");
+  card.className = "month" + (isCurrent ? " current":"");
+
+  card.innerHTML = `
+    <div class="m-head">
+      <div>
+        <div class="m-title">${MONTH_NAMES[m]} <span style="color:var(--muted);font-weight:600">${y}</span></div>
+        <div class="m-sub">${goalLine} &nbsp;·&nbsp; <b class="hit">✓${hits}</b> <b class="miss">✕${miss}</b> &nbsp;·&nbsp; ${logged}/${dim} days</div>
+      </div>
+    </div>
+    <div class="m-body">
+      <div class="weekcol" data-weekcol></div>
+      <div class="cal">
+        <div class="dow">${DOW_SUN.map(x=>`<span>${x}</span>`).join("")}</div>
+        <div class="weeks" data-weeks></div>
+      </div>
+    </div>`;
+
+  const weeksHost = card.querySelector("[data-weeks]");
+  const weekColHost = card.querySelector("[data-weekcol]");
+  const tKey = todayKey();
+
+  weeks.forEach(week=>{
+    const wrow = document.createElement("div");
+    wrow.className="week";
+    let wSum=0, wLogged=0, wDays=0;
+    week.forEach(d=>{
+      const cell = document.createElement("div");
+      if(d===null){ cell.className="day empty"; wrow.appendChild(cell); return; }
+      wDays++;
+      const dk = dateKey(y,m,d);
+      const v = state.entries[dk];
+      const has = (v!==undefined && v!==null);
+      const h = has ? isHit(v) : null;
+      let cls = "day";
+      if(has) cls += h===true ? " hit" : h===false ? " miss" : " logged";
+      if(dk===tKey) cls += " today";
+      if(dk>tKey) cls += " future";
+      cell.className = cls;
+      if(has){ wSum += v; wLogged++; }
+      const label = has ? fmtK(v) : "";
+      cell.innerHTML = `<span class="num">${d}</span><span class="val">${label}</span>`;
+      cell.addEventListener("click", ()=> openDayEntry(dk, y, m, d));
+      wrow.appendChild(cell);
+    });
+    weeksHost.appendChild(wrow);
+
+    // weekly overview cell (desktop): total vs weekly objective = daily goal × days in this week
+    const wc = document.createElement("div");
+    const g = state.metric.value;
+    const gSet = !(g===null || g===undefined || g==="" || isNaN(g));
+    if(wLogged>0){
+      let deltaStr = wLogged + "d", good = false, cls = "weekcell";
+      if(gSet){
+        const weekGoal = g * wDays;                     // objective for the days in this row
+        const delta = wSum - weekGoal;
+        good = state.metric.dir==="at most" ? wSum<=weekGoal : wSum>=weekGoal;
+        deltaStr = (delta>=0?"+":"−") + fmtK(Math.abs(delta));
+        cls += good ? " good" : " mixed";
+      }
+      wc.className = cls;
+      wc.innerHTML = `${fmtK(wSum)}<small>${deltaStr}</small>`;
+    } else {
+      wc.className = "weekcell";
+    }
+    weekColHost.appendChild(wc);
+  });
+
+  return card;
+}
+
+/* number helpers */
+function isHit(v){                                  // true / false / null(no goal)
+  const g = state.metric.value;
+  if(g===null || g===undefined || g==="") return null;
+  return state.metric.dir==="at most" ? v <= g : v >= g;
+}
+
+/* day entry */
+let dayCtx = null;
+function openDayEntry(dk, y, m, d){
+  dayCtx = dk;
+  const g = state.metric;
+  document.getElementById("dayTitle").textContent = `${MONTH_NAMES[m]} ${d}, ${y}`;
+  document.getElementById("dayGoal").textContent =
+    (g.value===null || g.value===undefined || g.value==="")
+      ? "No goal set — this just logs the value."
+      : `${g.name}: goal ${g.dir} ${g.value} (${fmtK(g.value)})`;
+  document.getElementById("dayLbl").textContent =
+    (g.name||"Value") + " — full number";
+  const cur = state.entries[dk];
+  const inp = document.getElementById("dayInput");
+  inp.value = (cur!==undefined && cur!==null) ? cur : "";
+  openOverlay("dayOverlay");
+  setTimeout(()=>{ inp.focus(); inp.select(); }, 40);
+}
+function saveDayEntry(){
+  const raw = document.getElementById("dayInput").value.trim();
+  if(raw===""){ delete state.entries[dayCtx]; }
+  else {
+    const n = Number(raw);
+    if(isNaN(n)){ alert("Please enter a number."); return; }
+    state.entries[dayCtx] = n;
+  }
+  save(); renderMonths(); closeOverlay("dayOverlay");
+}
+function clearDayEntry(){ delete state.entries[dayCtx]; save(); renderMonths(); closeOverlay("dayOverlay"); }
+
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ---------- modals ---------- */
+function openOverlay(id){ document.getElementById(id).classList.add("open"); }
+function closeOverlay(id){ document.getElementById(id).classList.remove("open"); }
+document.querySelectorAll("[data-close]").forEach(b=> b.addEventListener("click", e=>{
+  e.target.closest(".overlay").classList.remove("open");
+}));
+document.querySelectorAll(".overlay").forEach(o=> o.addEventListener("click", e=>{
+  if(e.target===o) o.classList.remove("open");
+}));
+
+// Day entry wiring
+document.getElementById("daySave").addEventListener("click", saveDayEntry);
+document.getElementById("dayClear").addEventListener("click", clearDayEntry);
+document.getElementById("dayInput").addEventListener("keydown", e=>{ if(e.key==="Enter") saveDayEntry(); });
+
+// Month range
+document.getElementById("rangeBtn").addEventListener("click", ()=>{
+  document.getElementById("rangeStart").value = state.range.start;
+  document.getElementById("rangeEnd").value = state.range.end;
+  openOverlay("rangeOverlay");
+});
+document.getElementById("rangeConfirm").addEventListener("click", ()=>{
+  let a = document.getElementById("rangeStart").value;
+  let b = document.getElementById("rangeEnd").value;
+  if(!a || !b){ alert("Pick both a start and end month."); return; }
+  if(a > b){ const t=a; a=b; b=t; }
+  state.range = { start:a, end:b };
+  save(); renderMonths(); closeOverlay("rangeOverlay");
+});
+
+// Objective (daily goal only; metric is Calories / "at most")
+document.getElementById("settingsBtn").addEventListener("click", ()=>{
+  document.getElementById("setValue").value = state.metric.value ?? "";
+  openOverlay("settingsOverlay");
+});
+document.getElementById("settingsSave").addEventListener("click", ()=>{
+  const val = document.getElementById("setValue").value;
+  state.metric = { name:"Calories", value: val===""? "" : Number(val), dir:"at most" };
+  save(); renderMonths(); closeOverlay("settingsOverlay");
+});
+
+// Data menu (gear): Export / Import
+const gearBtn = document.getElementById("gearBtn");
+const gearMenu = document.getElementById("gearMenu");
+function closeGear(){ gearMenu.hidden = true; }
+gearBtn.addEventListener("click", (e)=>{ e.stopPropagation(); gearMenu.hidden = !gearMenu.hidden; });
+document.addEventListener("click", (e)=>{ if(!gearMenu.hidden && !e.target.closest(".menu-wrap")) closeGear(); });
+
+document.getElementById("exportBtn").addEventListener("click", ()=>{
+  closeGear();
+  const blob = new Blob([JSON.stringify(state,null,2)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "health-goal-dashboard.json";
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+});
+document.getElementById("importBtn").addEventListener("click", ()=>{ closeGear(); document.getElementById("importFile").click(); });
+document.getElementById("importFile").addEventListener("change", (e)=>{
+  const f = e.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = ()=>{
+    try{
+      const s = JSON.parse(r.result);
+      state = Object.assign(defaultState(), s);
+      save(); renderMonths();
+    }catch(err){ alert("Could not read that file."); }
+    e.target.value="";
+  };
+  r.readAsText(f);
+});
+
+/* ---------- cloud sync (Supabase) ---------- */
+let supa = null, cloudUser = null, pushTimer = null, lastSync = "";
+
+function cloudInit(){
+  if(!SUPABASE_URL || !SUPABASE_KEY || !window.supabase) return;
+  try{
+    supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+      auth: { experimental: { passkey: true } }   // enable WebAuthn passkeys
+    });
+    supa.auth.onAuthStateChange((_ev, session)=>{
+      cloudUser = session?.user || null;
+      setSyncDot(cloudUser ? "on" : "");
+      renderSyncBody();
+      if(cloudUser) cloudPull();
+    });
+  }catch(e){ console.warn("Supabase init failed", e); }
+}
+
+async function passkeySignIn(){
+  if(!supa) return;
+  const msg = document.getElementById("syncMsg");
+  if(msg) msg.textContent = "Waiting for your passkey…";
+  try{
+    const { error } = await supa.auth.signInWithPasskey();
+    if(error) throw error;
+    // success is handled by onAuthStateChange (renders signed-in state + pulls)
+  }catch(e){
+    if(msg) msg.textContent = /cancel|abort|NotAllowed/i.test(e.message||"")
+      ? "Cancelled."
+      : "No passkey on this device yet — use the email link below once, then register one.";
+  }
+}
+async function passkeyRegister(){
+  if(!supa || !cloudUser) return;
+  const msg = document.getElementById("syncMsg2");
+  if(msg) msg.textContent = "Follow your device's prompt…";
+  try{
+    const { error } = await supa.auth.registerPasskey();
+    if(error) throw error;
+    if(msg) msg.textContent = "Passkey registered — you can now sign in with it here and on synced devices.";
+  }catch(e){
+    if(msg) msg.textContent = "Error: " + (e.message || e);
+  }
+}
+
+function scheduleCloudPush(){
+  if(!supa || !cloudUser) return;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(cloudPush, 800);
+}
+async function cloudPush(){
+  if(!supa || !cloudUser) return;
+  setSyncDot("busy");
+  const { error } = await supa.from("dashboards").upsert(
+    { user_id: cloudUser.id, data: state, updated_at: new Date().toISOString() },
+    { onConflict: "user_id" }
+  );
+  if(error){ setSyncDot("err"); lastSync = "Error: " + error.message; }
+  else { setSyncDot("on"); lastSync = "Saved " + new Date().toLocaleTimeString(); }
+  renderSyncBody();
+}
+async function cloudPull(){
+  if(!supa || !cloudUser) return;
+  setSyncDot("busy");
+  const { data, error } = await supa.from("dashboards")
+    .select("data").eq("user_id", cloudUser.id).maybeSingle();
+  if(error){ setSyncDot("err"); lastSync = "Error: " + error.message; renderSyncBody(); return; }
+  if(!data){ cloudPush(); return; }                       // nothing remote yet — seed it
+  const remote = data.data || {};
+  if((remote.updatedAt || 0) > (state.updatedAt || 0)){
+    applyingRemote = true;
+    state = Object.assign(defaultState(), remote);
+    save();                                               // cache locally, no bump/push
+    applyingRemote = false;
+    renderSubtitle(); renderMonths();
+    lastSync = "Loaded from cloud " + new Date().toLocaleTimeString();
+  } else if((state.updatedAt || 0) > (remote.updatedAt || 0)){
+    cloudPush(); return;                                  // local is newer — push it up
+  } else {
+    lastSync = "Up to date";
+  }
+  setSyncDot("on");
+  renderSyncBody();
+}
+
+function setSyncDot(cls){
+  const d = document.getElementById("syncDot");
+  if(d) d.className = "dot" + (cls ? " " + cls : "");
+}
+
+function renderSyncBody(){
+  const body = document.getElementById("syncBody");
+  if(!body) return;
+  if(!window.supabase){
+    body.innerHTML = `<p class="hint">The sync library didn't load (offline or blocked). The app still works locally — reload when you're online.</p>`;
+    return;
+  }
+  if(!cloudUser){
+    body.innerHTML = `
+      <p class="hint">Sign in with your passkey — Face ID, Touch ID or your device PIN. Once it's set up, no password or email is needed.</p>
+      <button class="btn primary" id="pkSignIn">🔑 Sign in with passkey</button>
+      <p class="hint" id="syncMsg" style="margin-top:10px"></p>
+      <div style="border-top:1px solid var(--line); margin:16px 0 12px;"></div>
+      <p class="hint">First time — or a device that doesn't have your passkey yet? Get a one-time email link, then register a passkey from the next screen.</p>
+      <div class="field"><label>Email</label><input type="email" id="syncEmail" placeholder="you@example.com"></div>
+      <button class="btn" id="syncSend">Email me a sign-in link</button>
+      <p class="hint" id="syncMsg3" style="margin-top:8px"></p>`;
+    body.querySelector("#pkSignIn").onclick = passkeySignIn;
+    body.querySelector("#syncSend").onclick = async ()=>{
+      const email = body.querySelector("#syncEmail").value.trim();
+      if(!email) return;
+      const msg = body.querySelector("#syncMsg3");
+      msg.textContent = "Sending…";
+      const { error } = await supa.auth.signInWithOtp({
+        email, options:{ emailRedirectTo: location.href.split("#")[0] }
+      });
+      msg.textContent = error ? ("Error: " + error.message)
+                              : "Check your inbox and tap the link.";
+    };
+    return;
+  }
+  body.innerHTML = `
+    <p class="synced-as">Signed in as <b>${escapeHtml(cloudUser.email || cloudUser.id)}</b></p>
+    <p class="hint">${escapeHtml(lastSync || "Connected. Changes sync automatically.")}</p>
+    <button class="btn primary" id="pkRegister">🔑 Register a passkey on this device</button>
+    <p class="hint" id="syncMsg2" style="margin-top:8px"></p>
+    <div style="display:flex; gap:8px; margin-top:14px;">
+      <button class="btn" id="syncNow">Sync now</button>
+      <button class="btn ghost" id="syncOut">Sign out</button>
+    </div>`;
+  body.querySelector("#pkRegister").onclick = passkeyRegister;
+  body.querySelector("#syncNow").onclick = cloudPull;
+  body.querySelector("#syncOut").onclick = async ()=>{ await supa.auth.signOut(); };
+}
+
+document.getElementById("syncBtn").addEventListener("click", ()=>{ renderSyncBody(); openOverlay("syncOverlay"); });
+// Pick up changes made on other devices when you return to the tab.
+let focusTimer = null;
+document.addEventListener("visibilitychange", ()=>{
+  if(document.visibilityState === "visible" && supa && cloudUser){
+    clearTimeout(focusTimer); focusTimer = setTimeout(cloudPull, 300);
+  }
+});
+
+/* ---------- init ---------- */
+renderSubtitle();
+renderMonths();
+cloudInit();
+</script>
+</body>
+</html>
