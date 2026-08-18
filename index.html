@@ -57,6 +57,9 @@
     background:transparent; border:none; padding:9px 11px; border-radius:8px;
     font:inherit; font-size:13px; font-weight:600; color:var(--ink); cursor:pointer;}
   .menu button:hover{background:var(--chip);}
+  .menu-sep{height:1px; background:var(--line); margin:4px 6px;}
+  .gear-icon{font-size:19px; line-height:1;}
+  #gearBtn{padding:7px 11px;}
   button.btn, .btn{
     font:inherit; font-size:13px; font-weight:600; cursor:pointer;
     background:var(--panel); color:var(--ink);
@@ -97,6 +100,15 @@
   .weekcell.good{background:var(--hit-soft); color:var(--hit);}
   .weekcell.mixed{background:var(--miss-soft); color:var(--miss);}
   .weekcell small{font-weight:600; opacity:.7; font-size:9px;}
+
+  .weightcol{display:flex; flex-direction:column; gap:4px; width:58px; flex:none; padding-top:24px; position:relative;}
+  .weightcol .whead{position:absolute; top:5px; left:0; right:0; text-align:center; font-size:9px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.04em;}
+  .weightcell{flex:1; min-height:34px; display:flex; align-items:center;}
+  .weightcell input{width:100%; min-height:34px; text-align:center; font:inherit; font-size:12px; font-weight:700;
+    font-variant-numeric:tabular-nums; border:1px solid var(--line); border-radius:8px;
+    background:var(--panel); color:var(--ink); padding:2px 3px;}
+  .weightcell input:focus{outline:none; border-color:var(--accent);}
+  .weightcell input::placeholder{color:var(--muted); font-weight:500;}
 
   .cal{flex:1; display:flex; flex-direction:column; gap:4px;}
   .dow{display:grid; grid-template-columns:repeat(7,1fr); gap:4px;}
@@ -149,7 +161,7 @@
     .wrap{padding:20px 14px 60px;}
     header.top{flex-direction:column; gap:14px;}
     .months{grid-template-columns:1fr;}
-    .weekcol{display:none;}      /* hide weekly side column on phone */
+    .weekcol, .weightcol{display:none;}   /* hide side columns on phone */
     .day .num{font-size:9px;}
   }
 </style>
@@ -163,17 +175,18 @@
   </header>
 
   <div class="toolbar" style="margin-bottom:20px;">
-    <button class="btn primary" id="rangeBtn">＋ Months</button>
-    <button class="btn" id="settingsBtn">◎ Objective</button>
     <span style="flex:1"></span>
     <div class="menu-wrap">
-      <button class="btn" id="gearBtn" title="Data" aria-haspopup="true">⚙</button>
+      <button class="btn" id="gearBtn" title="Menu" aria-haspopup="true"><span class="dot" id="syncDot"></span><span class="gear-icon">⚙</span></button>
       <div class="menu" id="gearMenu" hidden>
+        <button id="rangeBtn">＋ Months…</button>
+        <button id="settingsBtn">◎ Objective…</button>
+        <button id="syncBtn">☁ Sync…</button>
+        <div class="menu-sep"></div>
         <button id="exportBtn">↧ Export data</button>
         <button id="importBtn">↥ Import data</button>
       </div>
     </div>
-    <button class="btn" id="syncBtn"><span class="dot" id="syncDot"></span>Sync</button>
     <input type="file" id="importFile" accept="application/json" hidden>
   </div>
 
@@ -262,7 +275,8 @@ const DOW_SUN = ["S","M","T","W","T","F","S"];   // weeks always start Sunday
 const defaultState = () => ({
   metric:{ name:"Calories", value:2000, dir:"at most" },   // goal in FULL numbers; "at most" = stay under
   range:{ start: ymKey(new Date()), end: ymKey(new Date()) },
-  entries:{},                // { "YYYY-MM-DD": <full number> }
+  entries:{},                // { "YYYY-MM-DD": <full number> }  daily calorie values
+  weights:{},                // { "YYYY-MM-DD": <number> }  keyed by that week's Sunday
   updatedAt:0                // ms epoch of last local change (for sync conflict resolution)
 });
 
@@ -415,10 +429,12 @@ function renderMonthCard(key, isCurrent){
         <div class="dow">${DOW_SUN.map(x=>`<span>${x}</span>`).join("")}</div>
         <div class="weeks" data-weeks></div>
       </div>
+      <div class="weightcol" data-weightcol><span class="whead">Weight</span></div>
     </div>`;
 
   const weeksHost = card.querySelector("[data-weeks]");
   const weekColHost = card.querySelector("[data-weekcol]");
+  const weightColHost = card.querySelector("[data-weightcol]");
   const tKey = todayKey();
 
   weeks.forEach(week=>{
@@ -465,6 +481,27 @@ function renderMonthCard(key, isCurrent){
       wc.className = "weekcell";
     }
     weekColHost.appendChild(wc);
+
+    // weight box at the end of the week, keyed by this week's Sunday date
+    const firstReal = week.find(d => d !== null);
+    const wDate = new Date(y, m, firstReal);
+    const sun = new Date(wDate); sun.setDate(wDate.getDate() - wDate.getDay());
+    const wKey = dateKey(sun.getFullYear(), sun.getMonth(), sun.getDate());
+    const wbox = document.createElement("div");
+    wbox.className = "weightcell";
+    const winput = document.createElement("input");
+    winput.type = "number"; winput.step = "any"; winput.inputMode = "decimal";
+    winput.placeholder = "kg";
+    winput.title = "Weight for week of " + wKey;
+    winput.value = (state.weights[wKey] !== undefined && state.weights[wKey] !== null) ? state.weights[wKey] : "";
+    winput.addEventListener("change", ()=>{
+      const raw = winput.value.trim();
+      if(raw === "") delete state.weights[wKey];
+      else { const n = Number(raw); if(!isNaN(n)) state.weights[wKey] = n; }
+      save();   // weight is independent of the grid — no full re-render needed
+    });
+    wbox.appendChild(winput);
+    weightColHost.appendChild(wbox);
   });
 
   return card;
@@ -550,12 +587,14 @@ document.getElementById("settingsSave").addEventListener("click", ()=>{
   save(); renderMonths(); closeOverlay("settingsOverlay");
 });
 
-// Data menu (gear): Export / Import
+// Gear menu (Months / Objective / Sync / Export / Import)
 const gearBtn = document.getElementById("gearBtn");
 const gearMenu = document.getElementById("gearMenu");
 function closeGear(){ gearMenu.hidden = true; }
 gearBtn.addEventListener("click", (e)=>{ e.stopPropagation(); gearMenu.hidden = !gearMenu.hidden; });
 document.addEventListener("click", (e)=>{ if(!gearMenu.hidden && !e.target.closest(".menu-wrap")) closeGear(); });
+// Any menu item click closes the dropdown (the item's own handler still opens its modal).
+gearMenu.addEventListener("click", (e)=>{ if(e.target.closest("button")) closeGear(); });
 
 document.getElementById("exportBtn").addEventListener("click", ()=>{
   closeGear();
