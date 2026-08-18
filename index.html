@@ -81,7 +81,9 @@
     background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
     box-shadow:var(--shadow); padding:16px; position:relative; overflow:hidden;
   }
-  .month.current{border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-soft), var(--shadow);}
+  .month.current{box-shadow:0 0 0 2px var(--accent-soft), var(--shadow);}
+  .month.budget-ok{border-color:var(--hit);}
+  .month.budget-over{border-color:var(--miss);}
   .m-head{display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; gap:8px;}
   .m-title{font-weight:800; letter-spacing:.02em; text-transform:uppercase; font-size:15px;}
   .m-sub{color:var(--muted); font-size:12px; font-variant-numeric:tabular-nums; margin-top:2px;}
@@ -107,10 +109,10 @@
   .months.show-weight .weightcol{display:flex;}
   .whead{height:14px; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.04em;}
   /* Side reveal arrows (desktop only) */
-  .revealArrow{flex:none; width:22px; align-self:stretch; margin-top:18px;
+  .revealArrow{flex:none; width:20px; height:34px; align-self:center;
     border:1px solid var(--line); border-radius:8px; background:var(--panel);
     color:var(--muted); cursor:pointer; display:flex; align-items:center; justify-content:center;
-    font-size:15px; font-weight:800; line-height:1; padding:0;}
+    font-size:14px; font-weight:800; line-height:1; padding:0;}
   .revealArrow:hover{border-color:var(--accent); color:var(--accent);}
   .revealArrow .chev-close{display:none;}
   .months.show-week .revealArrow.left .chev-open{display:none;}
@@ -425,9 +427,9 @@ function renderMonthCard(key, isCurrent){
   // monthly objective = daily goal × days in THIS month (months aren't equal)
   const gv = state.metric.value;
   const goalSet = !(gv===null || gv===undefined || gv==="" || isNaN(gv));
+  const monthGoal = goalSet ? gv * dim : null;
   let goalLine;
   if(goalSet){
-    const monthGoal = gv * dim;
     if(logged>0){
       const delta = total - monthGoal;
       const good = state.metric.dir==="at most" ? total<=monthGoal : total>=monthGoal;
@@ -441,8 +443,15 @@ function renderMonthCard(key, isCurrent){
     goalLine = `Σ <b>${fmtK(total)}</b>`;
   }
 
+  // month border reflects whether the budget was respected (green) or blown (red)
+  let budgetClass = "";
+  if(goalSet && logged>0){
+    const monthGood = state.metric.dir==="at most" ? total<=monthGoal : total>=monthGoal;
+    budgetClass = monthGood ? " budget-ok" : " budget-over";
+  }
+
   const card = document.createElement("div");
-  card.className = "month" + (isCurrent ? " current":"");
+  card.className = "month" + (isCurrent ? " current":"") + budgetClass;
 
   card.innerHTML = `
     <div class="m-head">
@@ -478,11 +487,9 @@ function renderMonthCard(key, isCurrent){
   weeks.forEach(week=>{
     const wrow = document.createElement("div");
     wrow.className="week";
-    let wSum=0, wLogged=0, wDays=0;
     week.forEach(d=>{
       const cell = document.createElement("div");
       if(d===null){ cell.className="day empty"; wrow.appendChild(cell); return; }
-      wDays++;
       const dk = dateKey(y,m,d);
       const v = state.entries[dk];
       const has = (v!==undefined && v!==null);
@@ -492,7 +499,6 @@ function renderMonthCard(key, isCurrent){
       if(dk===tKey) cls += " today";
       if(dk>tKey) cls += " future";
       cell.className = cls;
-      if(has){ wSum += v; wLogged++; }
       const label = has ? fmtK(v) : "";
       cell.innerHTML = `<span class="num">${d}</span><span class="val">${label}</span>`;
       cell.addEventListener("click", ()=> openDayEntry(dk, y, m, d));
@@ -500,31 +506,49 @@ function renderMonthCard(key, isCurrent){
     });
     weeksHost.appendChild(wrow);
 
-    // weekly overview cell (desktop): total vs weekly objective = daily goal × days in this week
+    // This week's Sunday, from any real day in the row (shared by weekly stats + weight).
+    const firstReal = week.find(d => d !== null);
+    const wDate = new Date(y, m, firstReal);
+    const sun = new Date(wDate); sun.setDate(wDate.getDate() - wDate.getDay());
+    const wKey = dateKey(sun.getFullYear(), sun.getMonth(), sun.getDate());
+
+    // Weekly overview = the COMPLETE Sun–Sat week (includes days from adjacent months).
+    // Intentionally redundant across months; does NOT change the month total.
+    let fullSum = 0, fullLogged = 0;
+    for(let k=0; k<7; k++){
+      const dd = new Date(sun); dd.setDate(sun.getDate() + k);
+      const val = state.entries[dateKey(dd.getFullYear(), dd.getMonth(), dd.getDate())];
+      if(val !== undefined && val !== null){ fullSum += val; fullLogged++; }
+    }
     const wc = document.createElement("div");
-    const g = state.metric.value;
-    const gSet = !(g===null || g===undefined || g==="" || isNaN(g));
-    if(wLogged>0){
-      let deltaStr = wLogged + "d", good = false, cls = "weekcell";
-      if(gSet){
-        const weekGoal = g * wDays;                     // objective for the days in this row
-        const delta = wSum - weekGoal;
-        good = state.metric.dir==="at most" ? wSum<=weekGoal : wSum>=weekGoal;
-        deltaStr = (delta>=0?"+":"−") + fmtK(Math.abs(delta));
-        cls += good ? " good" : " mixed";
+    if(fullLogged>0){
+      let main = fmtK(fullSum), sub = fullLogged + "d", cls = "weekcell";
+      if(goalSet){
+        const weekGoal = gv * 7;                          // full week always = daily × 7
+        const satD = new Date(sun); satD.setDate(sun.getDate() + 6);
+        const satKey = dateKey(satD.getFullYear(), satD.getMonth(), satD.getDate());
+        const inProgress = tKey >= wKey && tKey <= satKey;
+        const remainingDays = 7 - fullLogged;
+        const perDayLeft = remainingDays>0 ? (weekGoal - fullSum) / remainingDays : null;
+        if(inProgress && perDayLeft !== null && perDayLeft < gv){
+          // over pace this week — show what's left per remaining day to stay within budget
+          sub = fmtK(Math.max(0, perDayLeft)) + "/day";
+          cls += " mixed";
+        } else {
+          const delta = fullSum - weekGoal;
+          const good = state.metric.dir==="at most" ? fullSum<=weekGoal : fullSum>=weekGoal;
+          sub = (delta>=0?"+":"−") + fmtK(Math.abs(delta));
+          cls += good ? " good" : " mixed";
+        }
       }
       wc.className = cls;
-      wc.innerHTML = `${fmtK(wSum)}<small>${deltaStr}</small>`;
+      wc.innerHTML = `${main}<small>${sub}</small>`;
     } else {
       wc.className = "weekcell";
     }
     weekColHost.appendChild(wc);
 
     // weight box at the end of the week, keyed by this week's Sunday date
-    const firstReal = week.find(d => d !== null);
-    const wDate = new Date(y, m, firstReal);
-    const sun = new Date(wDate); sun.setDate(wDate.getDate() - wDate.getDay());
-    const wKey = dateKey(sun.getFullYear(), sun.getMonth(), sun.getDate());
     const wbox = document.createElement("div");
     wbox.className = "weightcell";
     const winput = document.createElement("input");
