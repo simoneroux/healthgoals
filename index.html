@@ -94,13 +94,15 @@
   }
   .month.current{box-shadow:0 0 0 2px var(--accent-soft), var(--shadow);}
   .month.budget-ok{border-color:var(--hit);}
-  .month.budget-over{border-color:var(--off);}
+  .month.budget-over{border-color:var(--miss);}    /* past month over for good — red */
+  .month.budget-warn{border-color:var(--off);}     /* current month off pace — blue */
   .m-head{display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; gap:8px;}
   .m-title{font-weight:800; letter-spacing:.02em; text-transform:uppercase; font-size:15px;}
   .m-sub{color:var(--muted); font-size:12px; font-variant-numeric:tabular-nums; margin-top:2px;}
   .m-sub b.hit{color:var(--hit);} .m-sub b.miss{color:var(--miss);}
   .m-sub .delta.good{color:var(--hit); font-weight:700;}
-  .m-sub .delta.bad{color:var(--off); font-weight:700;}
+  .m-sub .delta.bad{color:var(--miss); font-weight:700;}    /* over for good — red */
+  .m-sub .delta.warn{color:var(--off); font-weight:700;}    /* current month off pace — blue */
   .m-sub .muted{opacity:.7;}
 
   /* Each month is ONE horizontal strip: Cals/wk · Calendar · Weight.
@@ -117,7 +119,8 @@
     background:var(--chip); color:var(--muted); min-height:34px;
   }
   .weekcell.good{background:var(--hit-soft); color:var(--hit);}
-  .weekcell.mixed{background:var(--off-soft); color:var(--off);}
+  .weekcell.mixed{background:var(--miss-soft); color:var(--miss);}   /* over for good — red */
+  .weekcell.warn{background:var(--off-soft); color:var(--off);}      /* current week off pace — blue */
   .weekcell small{font-weight:600; opacity:.7; font-size:9px;}
 
   .weightcol{display:flex; flex-direction:column; gap:4px; width:58px; flex:none; scroll-snap-align:end;}
@@ -433,26 +436,28 @@ function renderMonthCard(key, isCurrent){
   const goalSet = !(gv===null || gv===undefined || gv==="" || isNaN(gv));
   const monthGoal = goalSet ? gv * dim : null;
 
-  // "Off track" = average per logged day is over the daily goal (pace-based). Shown in blue.
-  let offTrack = false, budgetClass = "";
-  if(goalSet && logged>0){
-    const pace = gv * logged;
-    offTrack = state.metric.dir==="at most" ? total > pace : total < pace;
-    budgetClass = offTrack ? " budget-over" : " budget-ok";
-  }
-
-  let goalLine;
+  // Current month off pace → blue (still fixable, shows per-day-left). Past month over → red (settled).
+  let budgetClass = "", goalLine;
   if(goalSet){
     if(logged>0){
-      const remaining = dim - logged;
-      const perDayLeft = remaining > 0 ? (monthGoal - total) / remaining : null;
+      const delta = total - monthGoal;
+      const deltaStr = (delta>=0?'+':'−') + fmtK(Math.abs(delta));
       let status;
-      if(isCurrent && offTrack && perDayLeft !== null){
-        // same idea as the weekly line: how much per remaining day keeps the month within budget
-        status = `<span class="delta bad">${fmtK(Math.max(0, perDayLeft))}/day left</span>`;
+      if(isCurrent){
+        const off = state.metric.dir==="at most" ? total > gv*logged : total < gv*logged;
+        const remaining = dim - logged;
+        const perDayLeft = remaining > 0 ? (monthGoal - total) / remaining : null;
+        if(off && perDayLeft !== null){
+          budgetClass = " budget-warn";
+          status = `<span class="delta warn">${fmtK(Math.max(0, perDayLeft))}/day left</span>`;
+        } else {
+          budgetClass = " budget-ok";
+          status = `<span class="delta good">${deltaStr}</span>`;
+        }
       } else {
-        const delta = total - monthGoal;
-        status = `<span class="delta ${offTrack?'bad':'good'}">${delta>=0?'+':'−'}${fmtK(Math.abs(delta))}</span>`;
+        const over = state.metric.dir==="at most" ? total > monthGoal : total < monthGoal;
+        budgetClass = over ? " budget-over" : " budget-ok";
+        status = `<span class="delta ${over?'bad':'good'}">${deltaStr}</span>`;
       }
       goalLine = `<b>${fmtK(total)}</b> / ${fmtK(monthGoal)} ${status}`;
     } else {
@@ -542,9 +547,9 @@ function renderMonthCard(key, isCurrent){
         const remainingDays = 7 - fullLogged;
         const perDayLeft = remainingDays>0 ? (weekGoal - fullSum) / remainingDays : null;
         if(inProgress && perDayLeft !== null && perDayLeft < gv){
-          // over pace this week — show what's left per remaining day to stay within budget
+          // current week off pace — show what's left per remaining day (blue = still fixable)
           sub = fmtK(Math.max(0, perDayLeft)) + "/day";
-          cls += " mixed";
+          cls += " warn";
         } else {
           const delta = fullSum - weekGoal;
           const good = state.metric.dir==="at most" ? fullSum<=weekGoal : fullSum>=weekGoal;
