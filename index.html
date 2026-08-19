@@ -19,6 +19,7 @@
     --accent:#e5322d; --accent-soft:#fdecec;
     --hit:#16a34a; --hit-soft:#e7f6ec;
     --miss:#dc2626; --miss-soft:#fdecec;
+    --off:#2563eb; --off-soft:#e6edfe;   /* off-track / over budget — blue to grab attention */
     --chip:#f1f3f5;
     --shadow:0 1px 2px rgba(16,24,40,.04), 0 1px 3px rgba(16,24,40,.06);
     --radius:16px;
@@ -30,6 +31,7 @@
       --accent:#ff5a54; --accent-soft:#2a1515;
       --hit:#3fbf6b; --hit-soft:#12251a;
       --miss:#f0554f; --miss-soft:#2a1414;
+      --off:#5b8cff; --off-soft:#16233f;
       --chip:#20242c;
       --shadow:0 1px 2px rgba(0,0,0,.3);
     }
@@ -92,13 +94,13 @@
   }
   .month.current{box-shadow:0 0 0 2px var(--accent-soft), var(--shadow);}
   .month.budget-ok{border-color:var(--hit);}
-  .month.budget-over{border-color:var(--miss);}
+  .month.budget-over{border-color:var(--off);}
   .m-head{display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; gap:8px;}
   .m-title{font-weight:800; letter-spacing:.02em; text-transform:uppercase; font-size:15px;}
   .m-sub{color:var(--muted); font-size:12px; font-variant-numeric:tabular-nums; margin-top:2px;}
   .m-sub b.hit{color:var(--hit);} .m-sub b.miss{color:var(--miss);}
   .m-sub .delta.good{color:var(--hit); font-weight:700;}
-  .m-sub .delta.bad{color:var(--miss); font-weight:700;}
+  .m-sub .delta.bad{color:var(--off); font-weight:700;}
   .m-sub .muted{opacity:.7;}
 
   /* Each month is ONE horizontal strip: Cals/wk · Calendar · Weight.
@@ -115,7 +117,7 @@
     background:var(--chip); color:var(--muted); min-height:34px;
   }
   .weekcell.good{background:var(--hit-soft); color:var(--hit);}
-  .weekcell.mixed{background:var(--miss-soft); color:var(--miss);}
+  .weekcell.mixed{background:var(--off-soft); color:var(--off);}
   .weekcell small{font-weight:600; opacity:.7; font-size:9px;}
 
   .weightcol{display:flex; flex-direction:column; gap:4px; width:58px; flex:none; scroll-snap-align:end;}
@@ -190,12 +192,6 @@
   code.sql{display:block; white-space:pre; overflow:auto; background:var(--bg); border:1px solid var(--line);
     border-radius:8px; padding:10px; font-size:11px; margin:8px 0;}
 
-  /* Touch devices (phone + iPad): bigger tap targets, no arrows (swipe only). */
-  @media (pointer:coarse){
-    .weekcell, .weightcell{min-height:44px;}
-    .whead{height:22px; font-size:11px;}
-    .revealArrow{display:none;}
-  }
   @media (max-width:720px){
     .wrap{padding:20px 14px 60px;}
     header.top{flex-direction:column; gap:14px;}
@@ -436,26 +432,34 @@ function renderMonthCard(key, isCurrent){
   const gv = state.metric.value;
   const goalSet = !(gv===null || gv===undefined || gv==="" || isNaN(gv));
   const monthGoal = goalSet ? gv * dim : null;
+
+  // "Off track" = average per logged day is over the daily goal (pace-based). Shown in blue.
+  let offTrack = false, budgetClass = "";
+  if(goalSet && logged>0){
+    const pace = gv * logged;
+    offTrack = state.metric.dir==="at most" ? total > pace : total < pace;
+    budgetClass = offTrack ? " budget-over" : " budget-ok";
+  }
+
   let goalLine;
   if(goalSet){
     if(logged>0){
-      const delta = total - monthGoal;
-      const good = state.metric.dir==="at most" ? total<=monthGoal : total>=monthGoal;
-      const sign = delta>=0 ? "+" : "−";
-      goalLine = `<b>${fmtK(total)}</b> / ${fmtK(monthGoal)} `
-               + `<span class="delta ${good?'good':'bad'}">${sign}${fmtK(Math.abs(delta))}</span>`;
+      const remaining = dim - logged;
+      const perDayLeft = remaining > 0 ? (monthGoal - total) / remaining : null;
+      let status;
+      if(isCurrent && offTrack && perDayLeft !== null){
+        // same idea as the weekly line: how much per remaining day keeps the month within budget
+        status = `<span class="delta bad">${fmtK(Math.max(0, perDayLeft))}/day left</span>`;
+      } else {
+        const delta = total - monthGoal;
+        status = `<span class="delta ${offTrack?'bad':'good'}">${delta>=0?'+':'−'}${fmtK(Math.abs(delta))}</span>`;
+      }
+      goalLine = `<b>${fmtK(total)}</b> / ${fmtK(monthGoal)} ${status}`;
     } else {
       goalLine = `<span class="muted">0 / ${fmtK(monthGoal)} goal</span>`;
     }
   } else {
     goalLine = `Σ <b>${fmtK(total)}</b>`;
-  }
-
-  // month border reflects whether the budget was respected (green) or blown (red)
-  let budgetClass = "";
-  if(goalSet && logged>0){
-    const monthGood = state.metric.dir==="at most" ? total<=monthGoal : total>=monthGoal;
-    budgetClass = monthGood ? " budget-ok" : " budget-over";
   }
 
   const card = document.createElement("div");
@@ -469,7 +473,7 @@ function renderMonthCard(key, isCurrent){
       </div>
     </div>
     <div class="carousel">
-      <button class="revealArrow left" data-dir="-1" title="Show weekly totals" aria-label="Pan left">‹</button>
+      <button class="revealArrow left" data-side="0" title="Show/hide weekly totals" aria-label="Toggle weekly totals">‹</button>
       <div class="m-body">
         <div class="weekcol" data-weekcol><span class="whead">Cals/wk</span></div>
         <div class="cal">
@@ -478,7 +482,7 @@ function renderMonthCard(key, isCurrent){
         </div>
         <div class="weightcol" data-weightcol><span class="whead">Weight</span></div>
       </div>
-      <button class="revealArrow right" data-dir="1" title="Show weight" aria-label="Pan right">›</button>
+      <button class="revealArrow right" data-side="2" title="Show/hide weight" aria-label="Toggle weight">›</button>
     </div>`;
 
   const weeksHost = card.querySelector("[data-weeks]");
@@ -486,9 +490,9 @@ function renderMonthCard(key, isCurrent){
   const weightColHost = card.querySelector("[data-weightcol]");
   const tKey = todayKey();
 
-  // Desktop arrows pan EVERY month's strip in sync (touch devices just swipe).
+  // Each arrow opens/closes its own side, for every month at once (touch devices just swipe).
   card.querySelectorAll(".revealArrow").forEach(btn=>{
-    btn.addEventListener("click", ()=> scrollAllPanes(Number(btn.dataset.dir)));
+    btn.addEventListener("click", ()=> toggleSide(Number(btn.dataset.side)));
   });
 
   weeks.forEach(week=>{
@@ -605,11 +609,13 @@ function paneIndexOf(mb){
   t.forEach((v, i)=>{ const d = Math.abs(v - s); if(d < bd){ bd = d; best = i; } });
   return best;
 }
-function scrollAllPanes(delta){   // delta -1 / +1 — moves every month's strip in sync
+// Each arrow opens/closes its own side (0 = Cals/wk, 2 = Weight) for every month at once.
+function toggleSide(side){
+  const cur = paneIndexOf(document.querySelector(".m-body"));
+  const dest = (cur === side) ? 1 : side;   // already open on that side → close back to the calendar
   document.querySelectorAll(".m-body").forEach(mb=>{
-    const idx = Math.max(0, Math.min(2, paneIndexOf(mb) + delta));
     const t = paneTargets(mb);
-    mb.scrollTo({ left: t[idx], behavior: "smooth" });
+    mb.scrollTo({ left: t[dest], behavior: "smooth" });
   });
 }
 
