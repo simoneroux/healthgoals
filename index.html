@@ -59,7 +59,7 @@
   .iconbtn{background:transparent; border:none; box-shadow:none; padding:6px; margin:-6px -6px -6px 0;
     color:var(--muted); cursor:pointer; display:inline-flex; align-items:center; gap:6px; border-radius:8px; transition:.12s;}
   .iconbtn:hover{color:var(--ink); background:var(--chip);}
-  .iconbtn .gear-icon{font-size:22px; line-height:1;}
+  .iconbtn .gear-icon{display:block; width:21px; height:21px;}
   .subtitle{margin:6px 0 0; color:var(--muted); font-size:15px; font-variant-numeric:tabular-nums;}
   .subtitle b{color:var(--ink); font-weight:700;}
   .subtitle .sep{opacity:.4; margin:0 8px;}
@@ -213,7 +213,7 @@
   <header class="top">
     <h1>Health Goal<span class="t-dim"> Dashboard</span></h1>
     <div class="menu-wrap">
-      <button class="iconbtn" id="gearBtn" title="Menu" aria-haspopup="true"><span class="dot" id="syncDot"></span><span class="gear-icon">⚙</span></button>
+      <button class="iconbtn" id="gearBtn" title="Menu" aria-haspopup="true"><span class="dot" id="syncDot"></span><svg class="gear-icon" viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.1"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
       <div class="menu" id="gearMenu" hidden>
         <button id="rangeBtn">＋ Months…</button>
         <button id="settingsBtn">◎ Objective…</button>
@@ -330,6 +330,11 @@ function fmtK(n){
   const r = Math.round(k*10)/10;
   return (Number.isInteger(r) ? String(r) : r.toFixed(1)) + "k";
 }
+// Whole-thousands version (no decimal) for the month summary line.
+function fmtK0(n){
+  if(n===""||n===null||n===undefined||isNaN(n)) return "—";
+  return Math.round((+n)/1000) + "k";
+}
 
 function load(){
   try{
@@ -440,7 +445,7 @@ function renderMonthCard(key, isCurrent){
   if(goalSet){
     if(logged>0){
       const delta = total - monthGoal;
-      const deltaStr = (delta>=0?'+':'−') + fmtK(Math.abs(delta));
+      const deltaStr = (delta>=0?'+':'−') + fmtK0(Math.abs(delta));
       let status;
       if(isCurrent){
         const off = state.metric.dir==="at most" ? total > gv*logged : total < gv*logged;
@@ -448,7 +453,7 @@ function renderMonthCard(key, isCurrent){
         const perDayLeft = remaining > 0 ? (monthGoal - total) / remaining : null;
         if(off && perDayLeft !== null){
           budgetClass = " budget-warn";
-          status = `<span class="delta warn">${fmtK(Math.max(0, perDayLeft))}/day left</span>`;
+          status = `<span class="delta warn">${fmtK0(Math.max(0, perDayLeft))}/day left</span>`;
         } else {
           budgetClass = " budget-ok";
           status = `<span class="delta good">${deltaStr}</span>`;
@@ -458,12 +463,12 @@ function renderMonthCard(key, isCurrent){
         budgetClass = over ? " budget-over" : " budget-ok";
         status = `<span class="delta ${over?'bad':'good'}">${deltaStr}</span>`;
       }
-      goalLine = `<b>${fmtK(total)}</b> / ${fmtK(monthGoal)} ${status}`;
+      goalLine = `<b>${fmtK0(total)}</b> / ${fmtK0(monthGoal)} ${status}`;
     } else {
-      goalLine = `<span class="muted">0 / ${fmtK(monthGoal)} goal</span>`;
+      goalLine = `<span class="muted">0 / ${fmtK0(monthGoal)} goal</span>`;
     }
   } else {
-    goalLine = `Σ <b>${fmtK(total)}</b>`;
+    goalLine = `Σ <b>${fmtK0(total)}</b>`;
   }
 
   const card = document.createElement("div");
