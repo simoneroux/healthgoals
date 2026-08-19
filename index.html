@@ -588,7 +588,15 @@ function renderMonthCard(key, isCurrent){
   pager.innerHTML = '<span></span><span class="on"></span><span></span>';
   card.appendChild(pager);
   const mbody = card.querySelector(".m-body");
-  const setPager = ()=>{ const i = paneIndexOf(mbody); [...pager.children].forEach((s, idx)=> s.classList.toggle("on", idx===i)); };
+  const leftArrow = card.querySelector(".revealArrow.left");
+  const rightArrow = card.querySelector(".revealArrow.right");
+  const setPager = ()=>{
+    const i = paneIndexOf(mbody);
+    [...pager.children].forEach((s, idx)=> s.classList.toggle("on", idx===i));
+    // arrow points the opposite way when its own side is open (i.e. click to close)
+    leftArrow.textContent = (i===0) ? "›" : "‹";
+    rightArrow.textContent = (i===2) ? "‹" : "›";
+  };
   // Start centered on the calendar once the strip has laid out.
   const centerCal = ()=>{ const t = paneTargets(mbody); if(t[2] > 4){ mbody.scrollLeft = t[1]; setPager(); } };
   requestAnimationFrame(()=> requestAnimationFrame(centerCal));
