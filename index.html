@@ -19,7 +19,7 @@
     --bg:#f6f7f9; --panel:#ffffff; --ink:#111318; --muted:#6b7280;
     --line:#e5e7eb; --line-strong:#d1d5db;
     --accent:#e5322d; --accent-soft:#fdecec;
-    --hit:#16a34a; --hit-soft:#e7f6ec;
+    --hit:#079b34; --hit-soft:#bff3cf;   /* brighter, high-contrast green */
     --miss:#dc2626; --miss-soft:#fdecec;
     --off:#2563eb; --off-soft:#e6edfe;   /* off-track / over budget — blue to grab attention */
     --chip:#f1f3f5;
@@ -31,7 +31,7 @@
       --bg:#0e0f13; --panel:#16181e; --ink:#f3f4f6; --muted:#9aa2ad;
       --line:#262a32; --line-strong:#333844;
       --accent:#ff5a54; --accent-soft:#2a1515;
-      --hit:#3fbf6b; --hit-soft:#12251a;
+      --hit:#3ee06f; --hit-soft:#153f22;   /* brighter, high-contrast green */
       --miss:#f0554f; --miss-soft:#2a1414;
       --off:#5b8cff; --off-soft:#16233f;
       --chip:#20242c;
@@ -158,6 +158,8 @@
   .dow span{text-align:center; font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase;}
   .weeks{display:flex; flex-direction:column; gap:6px;}
   .week{display:grid; grid-template-columns:repeat(7,1fr); gap:6px;}
+  /* current week heading over budget — whole row highlighted blue */
+  .week.heading{border-radius:12px; background:var(--off-soft); box-shadow:0 0 0 2.5px var(--off);}
   .day{
     aspect-ratio:1/1; border:1px solid var(--line); border-radius:9px;
     position:relative; cursor:pointer; user-select:none; background:var(--panel);
@@ -560,6 +562,7 @@ function renderMonthCard(key, isCurrent){
           // current week off pace — show what's left per remaining day (blue = still fixable)
           sub = fmtK(Math.max(0, perDayLeft)) + "/day";
           cls += " warn";
+          wrow.classList.add("heading");   // highlight the whole week in blue
         } else {
           const delta = fullSum - weekGoal;
           const good = state.metric.dir==="at most" ? fullSum<=weekGoal : fullSum>=weekGoal;
@@ -903,6 +906,15 @@ document.addEventListener("visibilitychange", ()=>{
 renderSubtitle();
 renderMonths();
 cloudInit();
+// On load, bring the current month into view (once, after layout settles).
+function scrollToCurrentMonth(){
+  const cur = document.querySelector(".month.current");
+  if(!cur) return;
+  const y = cur.getBoundingClientRect().top + window.scrollY - 14;
+  if(y > 4) window.scrollTo(0, y);
+}
+requestAnimationFrame(()=> requestAnimationFrame(scrollToCurrentMonth));
+window.addEventListener("load", ()=> setTimeout(scrollToCurrentMonth, 80));
 </script>
 </body>
 </html>
