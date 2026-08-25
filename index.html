@@ -158,13 +158,11 @@
   .dow span{text-align:center; font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase;}
   .weeks{display:flex; flex-direction:column; gap:6px;}
   .week{display:grid; grid-template-columns:repeat(7,1fr); gap:6px;}
-  /* current week heading over budget — soft blue background behind the whole row */
-  .week.heading{position:relative;}
-  .week.heading::before{content:""; position:absolute; inset:-4px 0; z-index:0;
-    background:var(--off-soft); border-radius:12px;}
-  .week.heading .day{z-index:1;}
-  /* empty days in that week show the blue through; logged days keep their colour */
-  .week.heading .day:not(.hit):not(.miss):not(.logged){background:transparent; border-color:transparent;}
+  /* current week heading over budget — its empty days fill blue (logged days keep their colour) */
+  .week.heading .day:not(.hit):not(.miss):not(.logged){
+    background:var(--off-soft);
+    border-color:color-mix(in srgb, var(--off) 40%, var(--panel));
+  }
   .day{
     aspect-ratio:1/1; border:1px solid var(--line); border-radius:9px;
     position:relative; cursor:pointer; user-select:none; background:var(--panel);
