@@ -171,9 +171,10 @@
   .day:hover{border-color:var(--line-strong);}
   .day.empty{visibility:hidden; cursor:default;}
   .day .num{position:absolute; top:3px; left:5px; font-size:10px; color:var(--muted); font-variant-numeric:tabular-nums;}
-  .day .val{font-size:clamp(11px,3vw,14px); font-weight:800; line-height:1; font-variant-numeric:tabular-nums; padding:0 2px; text-align:center;}
-  /* faint placeholder: calories left per remaining day this week */
-  .day .val.hint{font-weight:600; color:var(--muted); opacity:.5;}
+  .day .val{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    font-size:clamp(11px,3vw,14px); font-weight:800; line-height:1; font-variant-numeric:tabular-nums; text-align:center; white-space:nowrap;}
+  /* faint placeholder: calories left per remaining day this week (same box as a real value) */
+  .day .val.ph{color:var(--muted); opacity:.45;}
   .day.hit{background:var(--hit-soft); border-color:var(--hit);}
   .day.hit .val, .day.hit .num{color:var(--hit);}
   .day.miss{background:var(--miss-soft); border-color:var(--miss);}
@@ -556,7 +557,7 @@ function renderMonthCard(key, isCurrent){
       let valCls = "val";
       if(!has && inProgress && perDayLeft !== null && dk >= tKey){
         label = fmtK(Math.max(0, perDayLeft));
-        valCls += " hint";
+        valCls += " ph";
       }
       cell.innerHTML = `<span class="num">${d}</span><span class="${valCls}">${label}</span>`;
       cell.addEventListener("click", ()=> openDayEntry(dk, y, m, d));
