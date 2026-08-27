@@ -172,6 +172,8 @@
   .day.empty{visibility:hidden; cursor:default;}
   .day .num{position:absolute; top:3px; left:5px; font-size:10px; color:var(--muted); font-variant-numeric:tabular-nums;}
   .day .val{font-size:clamp(11px,3vw,14px); font-weight:800; line-height:1; font-variant-numeric:tabular-nums; padding:0 2px; text-align:center;}
+  /* faint placeholder: calories left per remaining day this week */
+  .day .val.hint{font-weight:600; color:var(--muted); opacity:.5;}
   .day.hit{background:var(--hit-soft); border-color:var(--hit);}
   .day.hit .val, .day.hit .num{color:var(--hit);}
   .day.miss{background:var(--miss-soft); border-color:var(--miss);}
@@ -510,6 +512,25 @@ function renderMonthCard(key, isCurrent){
   });
 
   weeks.forEach(week=>{
+    // ---- week-level values (shared by day placeholders, weekly stats and weight) ----
+    // The COMPLETE Sun–Sat week (includes days from adjacent months); does NOT change the month total.
+    const firstReal = week.find(d => d !== null);
+    const wDate = new Date(y, m, firstReal);
+    const sun = new Date(wDate); sun.setDate(wDate.getDate() - wDate.getDay());
+    const wKey = dateKey(sun.getFullYear(), sun.getMonth(), sun.getDate());
+    let fullSum = 0, fullLogged = 0;
+    for(let k=0; k<7; k++){
+      const dd = new Date(sun); dd.setDate(sun.getDate() + k);
+      const val = state.entries[dateKey(dd.getFullYear(), dd.getMonth(), dd.getDate())];
+      if(val !== undefined && val !== null){ fullSum += val; fullLogged++; }
+    }
+    const satD = new Date(sun); satD.setDate(sun.getDate() + 6);
+    const satKey = dateKey(satD.getFullYear(), satD.getMonth(), satD.getDate());
+    const inProgress = tKey >= wKey && tKey <= satKey;
+    const weekGoal = goalSet ? gv * 7 : null;             // full week always = daily × 7
+    const remainingDays = 7 - fullLogged;
+    const perDayLeft = (goalSet && remainingDays > 0) ? (weekGoal - fullSum) / remainingDays : null;
+
     const wrow = document.createElement("div");
     wrow.className="week";
     week.forEach(d=>{
@@ -530,37 +551,24 @@ function renderMonthCard(key, isCurrent){
         cell.style.background   = `color-mix(in srgb, var(--miss) ${Math.round(10 + 40*s)}%, var(--panel))`;
         cell.style.borderColor  = `color-mix(in srgb, var(--miss) ${Math.round(45 + 55*s)}%, var(--panel))`;
       }
-      const label = has ? fmtK(v) : "";
-      cell.innerHTML = `<span class="num">${d}</span><span class="val">${label}</span>`;
+      // Current week: faint placeholder of calories left per remaining day, on today + future empty days.
+      let label = has ? fmtK(v) : "";
+      let valCls = "val";
+      if(!has && inProgress && perDayLeft !== null && dk >= tKey){
+        label = fmtK(Math.max(0, perDayLeft));
+        valCls += " hint";
+      }
+      cell.innerHTML = `<span class="num">${d}</span><span class="${valCls}">${label}</span>`;
       cell.addEventListener("click", ()=> openDayEntry(dk, y, m, d));
       wrow.appendChild(cell);
     });
     weeksHost.appendChild(wrow);
 
-    // This week's Sunday, from any real day in the row (shared by weekly stats + weight).
-    const firstReal = week.find(d => d !== null);
-    const wDate = new Date(y, m, firstReal);
-    const sun = new Date(wDate); sun.setDate(wDate.getDate() - wDate.getDay());
-    const wKey = dateKey(sun.getFullYear(), sun.getMonth(), sun.getDate());
-
-    // Weekly overview = the COMPLETE Sun–Sat week (includes days from adjacent months).
-    // Intentionally redundant across months; does NOT change the month total.
-    let fullSum = 0, fullLogged = 0;
-    for(let k=0; k<7; k++){
-      const dd = new Date(sun); dd.setDate(sun.getDate() + k);
-      const val = state.entries[dateKey(dd.getFullYear(), dd.getMonth(), dd.getDate())];
-      if(val !== undefined && val !== null){ fullSum += val; fullLogged++; }
-    }
+    // ---- weekly overview cell (uses the full-week values above) ----
     const wc = document.createElement("div");
     if(fullLogged>0){
       let main = fmtK(fullSum), sub = fullLogged + "d", cls = "weekcell";
       if(goalSet){
-        const weekGoal = gv * 7;                          // full week always = daily × 7
-        const satD = new Date(sun); satD.setDate(sun.getDate() + 6);
-        const satKey = dateKey(satD.getFullYear(), satD.getMonth(), satD.getDate());
-        const inProgress = tKey >= wKey && tKey <= satKey;
-        const remainingDays = 7 - fullLogged;
-        const perDayLeft = remainingDays>0 ? (weekGoal - fullSum) / remainingDays : null;
         if(inProgress && perDayLeft !== null && perDayLeft < gv){
           // current week off pace — show what's left per remaining day (blue = still fixable)
           sub = fmtK(Math.max(0, perDayLeft)) + "/day";
