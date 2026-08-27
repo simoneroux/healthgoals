@@ -577,7 +577,8 @@ function renderMonthCard(key, isCurrent){
           wrow.classList.add("heading");   // highlight the whole week in blue
         } else {
           const delta = fullSum - weekGoal;
-          const good = state.metric.dir==="at most" ? fullSum<=weekGoal : fullSum>=weekGoal;
+          const tol = gv * 0.25;   // weekly grace: ~0.5k on a 2k/day goal → still good up to 14.5k
+          const good = state.metric.dir==="at most" ? fullSum <= weekGoal + tol : fullSum >= weekGoal - tol;
           sub = (delta>=0?"+":"−") + fmtK(Math.abs(delta));
           cls += good ? " good" : " mixed";
         }
