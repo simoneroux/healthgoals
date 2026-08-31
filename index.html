@@ -117,7 +117,7 @@
   .m-body{display:flex; gap:8px; overflow-x:auto; scroll-snap-type:x proximity;
     -webkit-overflow-scrolling:touch; scrollbar-width:none; overscroll-behavior-x:contain;}
   .m-body::-webkit-scrollbar{display:none;}
-  .weekcol{display:flex; flex-direction:column; gap:6px; width:52px; flex:none; scroll-snap-align:start;}
+  .weekcol{display:flex; flex-direction:column; gap:6px; width:52px; flex:none; scroll-snap-align:start; padding-bottom:4px;}
   .weekcell{
     flex:1; border-radius:8px; display:flex; flex-direction:column; align-items:center; justify-content:center;
     font-size:11px; font-weight:700; font-variant-numeric:tabular-nums;
@@ -128,7 +128,7 @@
   .weekcell.warn{background:var(--off-soft); color:var(--off);}      /* current week off pace — blue */
   .weekcell small{font-weight:600; opacity:.7; font-size:9px;}
 
-  .weightcol{display:flex; flex-direction:column; gap:6px; width:58px; flex:none; scroll-snap-align:end;}
+  .weightcol{display:flex; flex-direction:column; gap:6px; width:58px; flex:none; scroll-snap-align:end; padding-bottom:4px;}
   .whead{height:14px; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.04em;}
 
   /* Reveal arrows overlay the calendar edges — desktop (mouse) only; touch devices swipe. */
@@ -153,7 +153,7 @@
   .weightcell input:focus{outline:none; border-color:var(--accent);}
   .weightcell input::placeholder{color:var(--muted); font-weight:500;}
 
-  .cal{flex:0 0 100%; min-width:100%; display:flex; flex-direction:column; gap:6px; scroll-snap-align:center;}
+  .cal{flex:0 0 100%; min-width:100%; display:flex; flex-direction:column; gap:6px; scroll-snap-align:center; padding-bottom:4px;}
   .dow{display:grid; grid-template-columns:repeat(7,1fr); gap:6px; height:14px; align-items:center;}
   .dow span{text-align:center; font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase;}
   .weeks{display:flex; flex-direction:column; gap:6px;}
